@@ -34,9 +34,14 @@ const addSeries = (marking: FileMarking, newIndex: number) => {
     marking.seriesIndices.push(newIndex);
 };
 
+const removeSeries = (marking: FileMarking, removeIndex: number) => {
+    marking.seriesIndices.splice(marking.seriesIndices.indexOf(removeIndex), 1);
+};
+
 export {
     addNewFileMarking,
     getFileMarking,
     addSeries,
+    removeSeries,
     FileMarking
 };

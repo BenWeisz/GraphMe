@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-import { addNewFileMarking, getFileMarking, FileMarking, addSeries } from './storage';
+import { addNewFileMarking, getFileMarking, FileMarking, addSeries, removeSeries } from './storage';
 import { getDataElements, DataElement } from './algorithm';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -25,7 +25,7 @@ export function activate(context: vscode.ExtensionContext) {
 						addSeries(marking, lineNum);
 					}
 					else {
-						// Add code to remove selection
+						removeSeries(marking, lineNum);
 					}
 				}
 			}
@@ -79,6 +79,15 @@ export function activate(context: vscode.ExtensionContext) {
 		},
 	});
 
+	const oddDecoration = vscode.window.createTextEditorDecorationType({
+		light: {
+			backgroundColor: '#FF505077'
+		},
+		dark: {
+			backgroundColor: '#FF505077'
+		}
+	});
+
 	const updateDecorations = () => {
 		if (!activeEditor) {
 			return;
@@ -94,7 +103,8 @@ export function activate(context: vscode.ExtensionContext) {
 		const text = activeEditor.document.getText();
 
 		let i: number = 0;
-		const highlights: vscode.DecorationOptions[] = [];
+		const highlightsEven: vscode.DecorationOptions[] = [];
+		const highlightsOdd: vscode.DecorationOptions[] = [];
 		while (i < marking.seriesIndices.length) {
 			const dataElements: DataElement[] = getDataElements(text, marking.colMode, marking.seriesIndices[i]);
 			
@@ -103,12 +113,20 @@ export function activate(context: vscode.ExtensionContext) {
 				const startPos: vscode.Position = new vscode.Position(rawStartPos.line, 0);
 				const endPos: vscode.Position = activeEditor.document.positionAt(dataElements[dataElements.length - 1].end);
 
-				highlights.push({ range: new vscode.Range(startPos, endPos) });
+				const highlightData = { range: new vscode.Range(startPos, endPos) };
+
+				if (rawStartPos.line % 2 === 0) {
+					highlightsEven.push(highlightData);
+				}
+				else {
+					highlightsOdd.push(highlightData);
+				}
 			}
 
 			i++;
 		}
-		activeEditor.setDecorations(evenDecoration, highlights);
+		activeEditor.setDecorations(evenDecoration, highlightsEven);
+		activeEditor.setDecorations(oddDecoration, highlightsOdd);
 	};
 
 	const triggerUpdateDecorations = (throttle = false) => {
