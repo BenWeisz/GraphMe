@@ -10,14 +10,24 @@
 		"Other"
 	],
 	"activationEvents": [
-        "onCommand:graphme.helloWorld"
+        "onCommand:graphme.markcol",
+		"onCommand:graphme.markrow",
+        "onCommand:graphme.gencode"
 	],
 	"main": "./dist/extension.js",
 	"contributes": {
 		"commands": [
 			{
-				"command": "graphme.helloWorld",
-				"title": "Hello World"
+				"command": "graphme.markcol",
+				"title": "Mark Column"
+			},
+			{
+				"command": "graphme.markrow",
+				"title": "Mark Row"
+			},
+			{
+				"command": "graphme.gencode",
+				"title": "Generate Graphing code"
 			}
 		]
 	},

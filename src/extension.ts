@@ -1,26 +1,129 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
-	
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "graphme" is now active!');
+import { addNewFileMarking, getFileMarking, FileMarking } from './storage';
+import { getDataElements } from './algorithm';
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('graphme.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from GraphMe!');
+export function activate(context: vscode.ExtensionContext) {
+	console.log('GraphMe extension activated.');
+
+	let activeEditor = vscode.window.activeTextEditor;
+
+	let markColDisposable = vscode.commands.registerCommand('graphme.markcol', () => {
+		vscode.window.showInformationMessage('Mark Column');
+	});
+	let markRowDisposable = vscode.commands.registerCommand('graphme.markrow', () => {
+		vscode.window.showInformationMessage('Mark Row');
+	});
+	
+	let genCodeDisposable = vscode.commands.registerCommand('graphme.gencode', () => {
+		const activeTextEditor: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
+		if (activeTextEditor) {
+			if (activeTextEditor?.document.fileName) {
+				const fileName: string = activeTextEditor?.document.fileName;
+				const marking: FileMarking | undefined = getFileMarking(fileName);
+				if (!marking) {
+					vscode.window.showErrorMessage('Please add graphing markings before generating graphing code!');
+				}
+				else {
+					vscode.window.showInformationMessage('TODO: Add code generation');
+				}
+			}
+			else { 
+				vscode.window.showErrorMessage('This file is not named');
+			}
+		}
+		else { 
+			vscode.window.showErrorMessage("This window editor does not contain graphing data.");
+		}
+		// const fileName: string = vscode.window.activeTextEditor?.document.fileName;
+
+		// getFileMarking()
 	});
 
-	context.subscriptions.push(disposable);
+	context.subscriptions.push(markColDisposable);
+	context.subscriptions.push(genCodeDisposable);
+	context.subscriptions.push(markRowDisposable);
+
+	// This portion of the code was modified from https://github.com/microsoft/vscode-extension-samples/tree/main/decorator-sample
+	let timeout: NodeJS.Timer | undefined = undefined;
+
+	// create a decorator type that we use to decorate small numbers
+	const smallNumberDecorationType = vscode.window.createTextEditorDecorationType({
+		light: {
+			// this color will be used in light color themes
+			backgroundColor: '#FF000055'
+		},
+		dark: {
+			// this color will be used in dark color themes
+			backgroundColor: '#FF000055'
+		},
+	});
+
+	const updateDecorations = () => {
+		if (!activeEditor) {
+			return;
+		}
+
+		getDataElements(activeEditor.document.getText(), false, 4);
+
+		const fileName: string = activeEditor?.document.fileName;
+		const marking: FileMarking | undefined = getFileMarking(fileName);
+		if (!marking) {
+			return;
+		}
+		
+		const text = activeEditor.document.getText();
+		// const highlights: vscode.DecorationOptions = [];
+
+
+
+		const regEx = /[\s\t]+/g;
+		const smallNumbers: vscode.DecorationOptions[] = [];
+		const largeNumbers: vscode.DecorationOptions[] = [];
+		let match;
+		while ((match = regEx.exec(text))) {
+			const startPos = activeEditor.document.positionAt(match.index);
+			const endPos = activeEditor.document.positionAt(match.index + match[0].length);
+			const decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: 'Number **' + match[0] + '**' };
+			if (match[0].length < 3) {
+				smallNumbers.push(decoration);
+			} else {
+				largeNumbers.push(decoration);
+			}
+		}
+		activeEditor.setDecorations(smallNumberDecorationType, smallNumbers);
+	};
+
+	const triggerUpdateDecorations = (throttle = false) => {
+		if (timeout) {
+			clearTimeout(timeout);
+			timeout = undefined;
+		}
+		if (throttle) {
+			timeout = setTimeout(updateDecorations, 500);
+		} else {
+			updateDecorations();
+		}
+	};
+
+	if (activeEditor) {
+		triggerUpdateDecorations();
+	}
+
+	vscode.window.onDidChangeActiveTextEditor(editor => {
+		activeEditor = editor;
+		if (editor) {
+			triggerUpdateDecorations();
+		}
+	}, null, context.subscriptions);
+
+	vscode.workspace.onDidChangeTextDocument(event => {
+		if (activeEditor && event.document === activeEditor.document) {
+			triggerUpdateDecorations(true);
+		}
+	}, null, context.subscriptions);
 }
 
 // this method is called when your extension is deactivated
 export function deactivate() {}
+
