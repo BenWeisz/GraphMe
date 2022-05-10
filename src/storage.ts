@@ -30,8 +30,13 @@ const addNewFileMarking = (fileName: string, colMode: boolean, newIndex: number 
 
 const getFileMarking = (fileName: string): FileMarking | undefined => storage.find((marking) => marking.fileName === fileName);
 
+const addSeries = (marking: FileMarking, newIndex: number) => {
+    marking.seriesIndices.push(newIndex);
+};
+
 export {
     addNewFileMarking,
     getFileMarking,
+    addSeries,
     FileMarking
 };

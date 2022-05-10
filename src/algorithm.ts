@@ -93,4 +93,4 @@ const getDataElements = (text: string, colMode: boolean = true, seriesIndex: num
     return dataElements;
 };
 
-export { getDataElements };
+export { getDataElements, DataElement };

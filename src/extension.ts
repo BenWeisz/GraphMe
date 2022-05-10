@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
-import { addNewFileMarking, getFileMarking, FileMarking } from './storage';
-import { getDataElements } from './algorithm';
+import { addNewFileMarking, getFileMarking, FileMarking, addSeries } from './storage';
+import { getDataElements, DataElement } from './algorithm';
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('GraphMe extension activated.');
@@ -12,14 +12,34 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.showInformationMessage('Mark Column');
 	});
 	let markRowDisposable = vscode.commands.registerCommand('graphme.markrow', () => {
-		vscode.window.showInformationMessage('Mark Row');
+		if (activeEditor) {
+			if (!activeEditor?.selection.isEmpty) {
+				const fileName: string = activeEditor.document.fileName;
+				let marking: FileMarking | undefined = getFileMarking(fileName);
+				const lineNum: number = activeEditor.selection.active.line;
+				if (!marking) {
+					addNewFileMarking(fileName, false, lineNum, null);
+				}
+				else {
+					if (!marking.seriesIndices.includes(lineNum)) {
+						addSeries(marking, lineNum);
+					}
+					else {
+						// Add code to remove selection
+					}
+				}
+			}
+			else {
+				vscode.window.showInformationMessage('Please highlight a row before using the Mark Row command.');
+			}
+			triggerUpdateDecorations();
+		}
 	});
 	
 	let genCodeDisposable = vscode.commands.registerCommand('graphme.gencode', () => {
-		const activeTextEditor: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
-		if (activeTextEditor) {
-			if (activeTextEditor?.document.fileName) {
-				const fileName: string = activeTextEditor?.document.fileName;
+		if (activeEditor) {
+			if (activeEditor?.document.fileName) {
+				const fileName: string = activeEditor?.document.fileName;
 				const marking: FileMarking | undefined = getFileMarking(fileName);
 				if (!marking) {
 					vscode.window.showErrorMessage('Please add graphing markings before generating graphing code!');
@@ -48,7 +68,7 @@ export function activate(context: vscode.ExtensionContext) {
 	let timeout: NodeJS.Timer | undefined = undefined;
 
 	// create a decorator type that we use to decorate small numbers
-	const smallNumberDecorationType = vscode.window.createTextEditorDecorationType({
+	const evenDecoration = vscode.window.createTextEditorDecorationType({
 		light: {
 			// this color will be used in light color themes
 			backgroundColor: '#FF000055'
@@ -64,8 +84,7 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 
-		getDataElements(activeEditor.document.getText(), false, 4);
-
+		
 		const fileName: string = activeEditor?.document.fileName;
 		const marking: FileMarking | undefined = getFileMarking(fileName);
 		if (!marking) {
@@ -73,25 +92,23 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 		
 		const text = activeEditor.document.getText();
-		// const highlights: vscode.DecorationOptions = [];
 
+		let i: number = 0;
+		const highlights: vscode.DecorationOptions[] = [];
+		while (i < marking.seriesIndices.length) {
+			const dataElements: DataElement[] = getDataElements(text, marking.colMode, marking.seriesIndices[i]);
+			
+			if (!marking.colMode) {
+				const rawStartPos: vscode.Position = activeEditor.document.positionAt(dataElements[0].start);
+				const startPos: vscode.Position = new vscode.Position(rawStartPos.line, 0);
+				const endPos: vscode.Position = activeEditor.document.positionAt(dataElements[dataElements.length - 1].end);
 
-
-		const regEx = /[\s\t]+/g;
-		const smallNumbers: vscode.DecorationOptions[] = [];
-		const largeNumbers: vscode.DecorationOptions[] = [];
-		let match;
-		while ((match = regEx.exec(text))) {
-			const startPos = activeEditor.document.positionAt(match.index);
-			const endPos = activeEditor.document.positionAt(match.index + match[0].length);
-			const decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: 'Number **' + match[0] + '**' };
-			if (match[0].length < 3) {
-				smallNumbers.push(decoration);
-			} else {
-				largeNumbers.push(decoration);
+				highlights.push({ range: new vscode.Range(startPos, endPos) });
 			}
+
+			i++;
 		}
-		activeEditor.setDecorations(smallNumberDecorationType, smallNumbers);
+		activeEditor.setDecorations(evenDecoration, highlights);
 	};
 
 	const triggerUpdateDecorations = (throttle = false) => {
