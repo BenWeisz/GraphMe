@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
-import { addNewFileMarking, getFileMarking, FileMarking, addSeries, removeSeries } from './storage';
-import { getDataElements, DataElement } from './algorithm';
+import { addNewFileMarking, resetFileMarking, getFileMarking, FileMarking, addSeries, removeSeries } from './storage';
+import { getDataElements, getSelectedColumn, DataElement } from './algorithm';
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('GraphMe extension activated.');
@@ -9,7 +9,45 @@ export function activate(context: vscode.ExtensionContext) {
 	let activeEditor = vscode.window.activeTextEditor;
 
 	let markColDisposable = vscode.commands.registerCommand('graphme.markcol', () => {
-		vscode.window.showInformationMessage('Mark Column');
+		if (activeEditor) {
+			if (!activeEditor?.selection.isEmpty) {
+				const fileName: string = activeEditor.document.fileName;
+				let marking: FileMarking | undefined = getFileMarking(fileName);
+				const lineNum: number = activeEditor.selection.active.line;
+
+				const text: string = activeEditor.document.getText();
+				const rowDataElements: DataElement[] = getDataElements(text, false, lineNum);
+				const columnSelection: number = getSelectedColumn(rowDataElements, activeEditor.selection.active.character);
+				if (columnSelection !== -1) {
+					if (!marking) {
+						addNewFileMarking(fileName, true);
+						marking = getFileMarking(fileName);
+						if (marking) { // Extra safety check
+							addSeries(marking, columnSelection);
+						}
+					}
+					else if (marking && !marking.colMode) {
+						resetFileMarking(marking, true);
+						addSeries(marking, columnSelection);
+					}
+					else {
+						if (!marking.seriesIndices.includes(columnSelection)) {
+							addSeries(marking, columnSelection);
+						}
+						else {
+							removeSeries(marking, columnSelection);
+						}
+					}
+				}
+				else {
+					vscode.window.showInformationMessage('Please highlight a row before using the Mark Row command.');
+				}
+			}
+			else {
+				vscode.window.showInformationMessage('Please highlight a row before using the Mark Row command.');
+			}
+			triggerUpdateDecorations();
+		}
 	});
 	let markRowDisposable = vscode.commands.registerCommand('graphme.markrow', () => {
 		if (activeEditor) {
@@ -18,7 +56,15 @@ export function activate(context: vscode.ExtensionContext) {
 				let marking: FileMarking | undefined = getFileMarking(fileName);
 				const lineNum: number = activeEditor.selection.active.line;
 				if (!marking) {
-					addNewFileMarking(fileName, false, lineNum, null);
+					addNewFileMarking(fileName, false);
+					marking = getFileMarking(fileName);
+					if (marking) {
+						addSeries(marking, lineNum);
+					}
+				}
+				else if (marking && marking.colMode) {
+					resetFileMarking(marking, false);
+					addSeries(marking, lineNum);
 				}
 				else {
 					if (!marking.seriesIndices.includes(lineNum)) {
@@ -92,7 +138,6 @@ export function activate(context: vscode.ExtensionContext) {
 		if (!activeEditor) {
 			return;
 		}
-
 		
 		const fileName: string = activeEditor?.document.fileName;
 		const marking: FileMarking | undefined = getFileMarking(fileName);
@@ -100,7 +145,7 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 		
-		const text = activeEditor.document.getText();
+		const text: string = activeEditor.document.getText();
 
 		let i: number = 0;
 		const highlightsEven: vscode.DecorationOptions[] = [];
@@ -109,9 +154,12 @@ export function activate(context: vscode.ExtensionContext) {
 			const dataElements: DataElement[] = getDataElements(text, marking.colMode, marking.seriesIndices[i]);
 			
 			if (!marking.colMode) {
-				const rawStartPos: vscode.Position = activeEditor.document.positionAt(dataElements[0].start);
+				const startDataElement: DataElement = dataElements[0];
+				const endDataElement: DataElement = dataElements[dataElements.length - 1];
+
+				const rawStartPos: vscode.Position = activeEditor.document.positionAt(startDataElement.start + startDataElement.offset);
 				const startPos: vscode.Position = new vscode.Position(rawStartPos.line, 0);
-				const endPos: vscode.Position = activeEditor.document.positionAt(dataElements[dataElements.length - 1].end);
+				const endPos: vscode.Position = activeEditor.document.positionAt(endDataElement.end + endDataElement.offset);
 
 				const highlightData = { range: new vscode.Range(startPos, endPos) };
 
@@ -120,6 +168,24 @@ export function activate(context: vscode.ExtensionContext) {
 				}
 				else {
 					highlightsOdd.push(highlightData);
+				}
+			}
+			else {
+				let j: number = 0;
+				while (j < dataElements.length) {
+					const dataElement: DataElement = dataElements[j];
+					const startPos: vscode.Position = activeEditor.document.positionAt(dataElement.start + dataElement.offset);
+					const endPos: vscode.Position = activeEditor.document.positionAt(dataElement.end + dataElement.offset);
+
+					const highlightData = { range: new vscode.Range(startPos, endPos) };
+
+					if (marking.seriesIndices[i] % 2 === 0) {
+						highlightsEven.push(highlightData);
+					}
+					else {
+						highlightsOdd.push(highlightData);
+					}
+					j++;
 				}
 			}
 

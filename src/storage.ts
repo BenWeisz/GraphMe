@@ -7,25 +7,20 @@ interface FileMarking {
 
 const storage: FileMarking[] = [];
 
-const addNewFileMarking = (fileName: string, colMode: boolean, newIndex: number | null, labels: Array<string> | null) => {
-    if (newIndex !== null) {
-        const marking: FileMarking = {
-            fileName,
-            colMode,
-            seriesIndices: [newIndex],
-            labels: []
-        };
-        storage.push(marking);
-    } else { 
-        const labelsList: Array<string> = labels !== null ? labels : [];
-        const marking: FileMarking = {
-            fileName,
-            colMode,
-            seriesIndices: [],
-            labels: labelsList
-        };
-        storage.push(marking);
-    }
+const addNewFileMarking = (fileName: string, colMode: boolean) => {
+    const marking: FileMarking = {
+        fileName,
+        colMode,
+        seriesIndices: [],
+        labels: []
+    };
+    storage.push(marking);
+};
+
+const resetFileMarking = (marking: FileMarking, colMode: boolean) => {
+    marking.colMode = colMode;
+    marking.seriesIndices = [];
+    marking.labels = [];
 };
 
 const getFileMarking = (fileName: string): FileMarking | undefined => storage.find((marking) => marking.fileName === fileName);
@@ -40,6 +35,7 @@ const removeSeries = (marking: FileMarking, removeIndex: number) => {
 
 export {
     addNewFileMarking,
+    resetFileMarking,
     getFileMarking,
     addSeries,
     removeSeries,
